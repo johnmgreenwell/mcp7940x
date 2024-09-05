@@ -1,0 +1,19 @@
+{
+    "name": "mcp7940x",
+    "version": "1.3.0",
+    "description": "Portable, multi-instance driver for MCP7940x RTCs",
+    "keywords": "embedded, driver, hal, rtc, mcp7940x, mcp7940",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/johnmgreenwell/mcp7940x"
+    },
+    "license": "MIT",
+    "frameworks": "*",
+    "platforms": "*",
+    "build": {
+        "libArchive": false,
+        "flags": [
+        "-I../../include"
+        ]
+    }
+}
