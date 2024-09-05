@@ -14,6 +14,19 @@ The MCP7940 allows for software trimming and the library has functions which sup
 <img src="https://github.com/Zanduino/MCP7940/blob/master/Images/MCP7940_bb.png" width="175px" align="left" /> A detailed library description along with further details are available at the GitHub [MCP7940 Wiki](https://github.com/Zanduino/MCP7940/wiki). This includes wiring information and sample sketches that illustrate the library and it's functionality.
 </br></br></br></br></br></br>
   
+## Usage
+
+For this modified version, the following hardware abstraction layer (HAL) requirements must be satisfied:
+
+* A header file `hal.h` providing access to HAL classes and methods.
+* An `I2C` class within the `HAL` namespace with the following methods:
+  - Write n bytes to the device: `write(uint8_t device_address, uint8_t * data_buffer, uint32_t length_in_bytes)`.
+  - Write a byte to the device followed by n bytes (a register and data to place there): `write(uint8_t device_address, uint8_t register, uint8_t * data_buffer, uint32_t length_in_bytes)`.
+  - Write one byte to the device, execute a repeated start, then read n bytes from the device: `writeRead(uint8_t device_address, uint8_t register, uint8_t * data_buffer, uint32_t length_in_bytes)`
+* A `delay_ms(uint32_t milliseconds)` function within the `HAL` namespace.
+
+Some further requirements may also be found. Typically, these will mirror the Arduino framework and should be added to `hal.h`.
+  
 ## Examples
 Several example sketches exist and are documented on the [Wiki pages](https://github.com/Zanduino/MCP7940/wiki)
 
