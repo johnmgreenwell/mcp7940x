@@ -3,8 +3,12 @@
 
 Arduino Library for the MCP7940M and MCP7940N Real-Time Clock devices\n\n
 See main library header file for details
+Modified by John Greenwell to add support for a custom HAL
 */
 #include "MCP7940.h"
+
+namespace PeripheralIO
+{
 
 /*! Define the number of days in each month */
 const uint8_t   daysInMonth[] PROGMEM = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -228,7 +232,7 @@ TimeSpan TimeSpan::operator+(const TimeSpan& right) {
 TimeSpan TimeSpan::operator-(const TimeSpan& right) {
   return TimeSpan(_seconds - right._seconds);
 }  // of overloaded subtract
-bool MCP7940_Class::begin(const uint32_t i2cSpeed) const {
+bool MCP7940::begin(const uint32_t i2cSpeed) const {
   /*!
       @brief     Start I2C device communications
       @details   Starts I2C comms with the device, using a default speed if one is not specified
@@ -237,7 +241,7 @@ bool MCP7940_Class::begin(const uint32_t i2cSpeed) const {
   */
   return begin(SDA, SCL, i2cSpeed);
 }  // of method begin()
-bool MCP7940_Class::begin(const uint8_t sda, const uint8_t scl, const uint32_t i2cSpeed) const {
+bool MCP7940::begin(const uint8_t sda, const uint8_t scl, const uint32_t i2cSpeed) const {
   /*!
       @brief     Start I2C device communications
       @details   Starts I2C comms with the device, using default SDA and SCL ports as well as speed
@@ -247,26 +251,21 @@ bool MCP7940_Class::begin(const uint8_t sda, const uint8_t scl, const uint32_t i
       @param[in] i2cSpeed defaults to I2C_STANDARD_MODE, otherwise use speed in Herz
       @return    true if successfully started communication, otherwise false
   */
-#if defined(ESP8266)
-  Wire.begin(sda, scl);  // Start I2C as master device using the specified SDA and SCL
-#elif defined(ESP8266)
-  Wire.begin();  // Start I2C as master device
-#endif
   (void)sda;                // force compiler to ignore this potentially unused parameter
   (void)scl;                // force compiler to ignore this potentially unused parameter
-  Wire.setClock(i2cSpeed);  // Set the I2C bus speed
-  Wire.beginTransmission(MCP7940_ADDRESS);  // Address the MCP7940
-  if (Wire.endTransmission() == 0)          // If there a device present
-  {
+//   Wire.setClock(i2cSpeed);  // Set the I2C bus speed
+//   Wire.beginTransmission(MCP7940_ADDRESS);  // Address the MCP7940
+//   if (Wire.endTransmission() == 0)          // If there a device present
+//   {
     clearRegisterBit(MCP7940_RTCHOUR, MCP7940_12_24);  // Use 24 hour clock
     setRegisterBit(MCP7940_CONTROL, MCP7940_ALMPOL);   // assert alarm low, default high
     return true;                                       // return success
-  } else {
-    return false;  // return error if no device found
-  }                // of if-then-else device detected
+//   } else {
+//     return false;  // return error if no device found
+//   }                // of if-then-else device detected
 }  // of method begin()
 
-uint8_t MCP7940_Class::readByte(const uint8_t addr) const {
+uint8_t MCP7940::readByte(const uint8_t addr) const {
   /*!
       @brief     Read a single byte from the device address
       @param[in] addr I2C device register address to read from
@@ -276,7 +275,7 @@ uint8_t MCP7940_Class::readByte(const uint8_t addr) const {
   I2C_read(addr, dataByte);
   return dataByte;
 }  // of method readByte()
-void MCP7940_Class::clearRegisterBit(const uint8_t reg, const uint8_t b) const {
+void MCP7940::clearRegisterBit(const uint8_t reg, const uint8_t b) const {
   /*!
       @brief     clears a specified bit in a register on the device
       @param[in] reg Register to write to
@@ -285,7 +284,7 @@ void MCP7940_Class::clearRegisterBit(const uint8_t reg, const uint8_t b) const {
   //  writeByte(reg, readByte(reg) & ~(1 << b));
   I2C_write(reg, (uint8_t)(readByte(reg) & ~(1 << b)));
 }  // of method clearRegisterBit()
-void MCP7940_Class::setRegisterBit(const uint8_t reg, const uint8_t b) const {
+void MCP7940::setRegisterBit(const uint8_t reg, const uint8_t b) const {
   /*!
       @brief     sets a specified bit in a register on the device
       @param[in] reg Register to write to
@@ -293,7 +292,7 @@ void MCP7940_Class::setRegisterBit(const uint8_t reg, const uint8_t b) const {
   */
   I2C_write(reg, (uint8_t)(readByte(reg) | (1 << b)));
 }  // of method setRegisterBit()
-void MCP7940_Class::writeRegisterBit(const uint8_t reg, const uint8_t b,
+void MCP7940::writeRegisterBit(const uint8_t reg, const uint8_t b,
                                      const bool bitvalue) const {
   /*!
       @brief     Sets or clears the specified bit based on bitvalue
@@ -303,7 +302,7 @@ void MCP7940_Class::writeRegisterBit(const uint8_t reg, const uint8_t b,
   */
   bitvalue ? setRegisterBit(reg, b) : clearRegisterBit(reg, b);
 }  // of method writeRegisterBit()
-uint8_t MCP7940_Class::readRegisterBit(const uint8_t reg, const uint8_t b) const {
+uint8_t MCP7940::readRegisterBit(const uint8_t reg, const uint8_t b) const {
   /*!
       @brief     read a specific bit from a register
       @param[in] reg      Register to read from
@@ -312,7 +311,7 @@ uint8_t MCP7940_Class::readRegisterBit(const uint8_t reg, const uint8_t b) const
    */
   return bitRead(readByte(reg), b);
 }  // of method readRegisterBit()
-uint8_t MCP7940_Class::bcd2int(const uint8_t bcd) const {
+uint8_t MCP7940::bcd2int(const uint8_t bcd) const {
   /*!
       @brief     converts a BCD encoded value into number representation
       @param[in] bcd Binary-Encoded-Decimal value
@@ -320,7 +319,7 @@ uint8_t MCP7940_Class::bcd2int(const uint8_t bcd) const {
    */
   return ((bcd / 16 * 10) + (bcd % 16));
 }  // of method bcd2int
-uint8_t MCP7940_Class::int2bcd(const uint8_t dec) const {
+uint8_t MCP7940::int2bcd(const uint8_t dec) const {
   /*!
       @brief     converts an integer to a BCD encoded value
       @param[in] dec Integer value
@@ -328,7 +327,7 @@ uint8_t MCP7940_Class::int2bcd(const uint8_t dec) const {
    */
   return ((dec / 10 * 16) + (dec % 10));
 }  // of method int2bcd
-bool MCP7940_Class::deviceStatus() const {
+bool MCP7940::deviceStatus() const {
   /*!
       @brief  checks to see if the MCP7940 crystal has been turned on or off
       @brief  Sets the status register to turn on the device clock
@@ -336,7 +335,7 @@ bool MCP7940_Class::deviceStatus() const {
    */
   return readRegisterBit(MCP7940_RTCSEC, MCP7940_ST);
 }  // of method DeviceStatus
-bool MCP7940_Class::deviceStart() const {
+bool MCP7940::deviceStart() const {
   /*!
       @brief  Start the MCP7940 device
       @details Sets the status register to turn on the device clock
@@ -349,11 +348,11 @@ bool MCP7940_Class::deviceStart() const {
     oscillatorStatus =
         readRegisterBit(MCP7940_RTCWKDAY, MCP7940_OSCRUN);  // Wait for oscillator to start
     if (oscillatorStatus) break;                            // Exit loop on success
-    delay(1);                                               // Allow oscillator time to start
+    HAL::delay_ms(1);                                       // Allow oscillator time to start
   }                                                         // of for-next oscillator loop
   return oscillatorStatus;
 }  // of method deviceStart
-bool MCP7940_Class::deviceStop() const {
+bool MCP7940::deviceStop() const {
   /*!
       @brief  Stop the MCP7940 device
       @details Sets the status register to turn off the device clock
@@ -365,11 +364,11 @@ bool MCP7940_Class::deviceStop() const {
     oscillatorStatus =
         readRegisterBit(MCP7940_RTCWKDAY, MCP7940_OSCRUN);  // Wait for oscillator to stop
     if (!oscillatorStatus) break;                           // Exit loop on success
-    delay(1);                                               // Allow oscillator time to stop
+    HAL::delay_ms(1);                                       // Allow oscillator time to stop
   }                                                         // of for-next oscillator loop
   return oscillatorStatus;
 }  // of method deviceStop
-DateTime MCP7940_Class::now() const {
+DateTime MCP7940::now() const {
   /*!
       @brief   returns the current date/time
       @details If the device is stopped then the stop time is returned
@@ -381,7 +380,7 @@ DateTime MCP7940_Class::now() const {
                   bcd2int(readBuffer[4] & 0x3F), bcd2int(readBuffer[2] & 0x3F),
                   bcd2int(readBuffer[1] & 0x7F), bcd2int(readBuffer[0] & 0x7F));
 }  // of method now
-DateTime MCP7940_Class::getPowerDown() const {
+DateTime MCP7940::getPowerDown() const {
   /*!
       @brief   returns the date/time that the power went off
       @details This is set back to zero once the power fail flag is reset.
@@ -397,7 +396,7 @@ DateTime MCP7940_Class::getPowerDown() const {
   }                                          // if-then success
   return DateTime(0, mon, day, hr, min, 0);  // Return class value
 }  // of method getPowerDown()
-DateTime MCP7940_Class::getPowerUp() const {
+DateTime MCP7940::getPowerUp() const {
   /*!
       @brief   returns the date/time that the power went back on
       @return  DateTime class value for the power-on Date/Time
@@ -412,7 +411,7 @@ DateTime MCP7940_Class::getPowerUp() const {
   }                                          // if-then success
   return DateTime(0, mon, day, hr, min, 0);  // Return class value
 }  // of method getPowerUp()
-void MCP7940_Class::adjust() {
+void MCP7940::adjust() {
   /*!
       @brief   sets the current date/time (overloaded)
       @details This is an overloaded function. With no parameters then the RTC is set to the
@@ -426,7 +425,7 @@ void MCP7940_Class::adjust() {
   DateTime tempDt = DateTime(tempDate, tempTime);  // Create a datetime
   adjust(tempDt);                                  // Set to library compile Date/Time //
 }  // of method "adjust()"
-void MCP7940_Class::adjust(const DateTime& dt) {
+void MCP7940::adjust(const DateTime& dt) {
   /*!
      @brief   sets the current date/time (overloaded)
      @details This is an overloaded function. Set to the DateTime class instance value. The
@@ -443,7 +442,7 @@ void MCP7940_Class::adjust(const DateTime& dt) {
   deviceStart();                                          // Restart the oscillator
   _SetUnixTime = dt.unixtime();                           // Store time of last change
 }  // of method adjust
-uint8_t MCP7940_Class::weekdayRead() const {
+uint8_t MCP7940::weekdayRead() const {
   /*!
       @brief   return the weekday number from the RTC
       @details This number is user-settable and is incremented when the day shifts. It is set as
@@ -452,7 +451,7 @@ uint8_t MCP7940_Class::weekdayRead() const {
   */
   return readByte(MCP7940_RTCWKDAY) & 0x07;  // no need to convert, values 1-7
 }  // of method weekdayRead()
-uint8_t MCP7940_Class::weekdayWrite(const uint8_t dow) const {
+uint8_t MCP7940::weekdayWrite(const uint8_t dow) const {
   /*!
       @brief   set the RTC weekday number
       @details This number is user-settable and is incremented when the day shifts. The library uses
@@ -468,7 +467,7 @@ uint8_t MCP7940_Class::weekdayWrite(const uint8_t dow) const {
   }                                       // of if-then we have a good DOW
   return retval;
 }  // of method weekdayWrite()
-int8_t MCP7940_Class::calibrate() const {
+int8_t MCP7940::calibrate() const {
   /*!
       @brief   Calibrate the MCP7940 (overloaded)
       @details When called with no parameters the internal calibration is reset to 0
@@ -478,7 +477,7 @@ int8_t MCP7940_Class::calibrate() const {
   I2C_write(MCP7940_OSCTRIM, (uint8_t)0);              // Write zeros to the trim register
   return (0);
 }  // of method calibrate()
-int8_t MCP7940_Class::calibrate(const int8_t newTrim) {
+int8_t MCP7940::calibrate(const int8_t newTrim) {
   /*!
       @brief   Calibrate the MCP7940 (overloaded)
       @details When called with one int8 parameter that value is used as the new trim value
@@ -495,7 +494,7 @@ int8_t MCP7940_Class::calibrate(const int8_t newTrim) {
   _SetUnixTime = now().unixtime();                     // Store time of last change        //
   return newTrim;
 }  // of method calibrate()
-int8_t MCP7940_Class::calibrate(const DateTime& dt) {
+int8_t MCP7940::calibrate(const DateTime& dt) {
   /*!
      @brief   Calibrate the MCP7940 (overloaded)
      @details When called with a DateTime class value then an internal calibration is performed.
@@ -524,7 +523,7 @@ int8_t MCP7940_Class::calibrate(const DateTime& dt) {
   trim = constrain(trim, -127, 127);   // Clamp to value range
   return calibrate((const int8_t)trim);
 }  // of method calibrate()
-int8_t MCP7940_Class::calibrate(const float fMeas) const {
+int8_t MCP7940::calibrate(const float fMeas) const {
   /*!
       @brief   Calibrate the MCP7940 (overloaded)
       @details When called with one floating point value then that is used as the measured frequency
@@ -555,7 +554,7 @@ int8_t MCP7940_Class::calibrate(const float fMeas) const {
   int8_t returnTrim = calibrate((int8_t)trim);  // Set the new trim value
   return (returnTrim);
 }  // of method calibrate()
-int8_t MCP7940_Class::calibrateOrAdjust(const DateTime& dt) {
+int8_t MCP7940::calibrateOrAdjust(const DateTime& dt) {
   /*!
     @brief   Calibrate the MCP7940 if the ppm deviation is < 130 and > -130 else Adjust the
     datetime.
@@ -575,7 +574,7 @@ int8_t MCP7940_Class::calibrateOrAdjust(const DateTime& dt) {
     return calibrate(dt);
   }  // if-then-else ppm out of range
 }  // method calibrateOrAdjust()
-int32_t MCP7940_Class::getPPMDeviation(const DateTime& dt) const {
+int32_t MCP7940::getPPMDeviation(const DateTime& dt) const {
   /*!
       @brief   Calculate the ppm deviation since the last time the clock was set
       @details The internal _SetUniTime value is set when the clock is set. On this call the current
@@ -589,7 +588,7 @@ int32_t MCP7940_Class::getPPMDeviation(const DateTime& dt) const {
   int32_t ppm = 1000000 * SecDeviation / ExpectedSec;       // Multiply first to avoid truncation
   return ppm;
 }
-void MCP7940_Class::setSetUnixTime(uint32_t aTime) {
+void MCP7940::setSetUnixTime(uint32_t aTime) {
   /*!
       @brief   Set the time the clock was last calibrated or adjusted.
       @details Set the internal variable _SetUnixTime.  This is the time the clock was last
@@ -600,7 +599,7 @@ void MCP7940_Class::setSetUnixTime(uint32_t aTime) {
   */
   _SetUnixTime = aTime;
 }
-uint32_t MCP7940_Class::getSetUnixTime() const {
+uint32_t MCP7940::getSetUnixTime() const {
   /*!
     @brief   Get the time the clock was last calibrated or adjusted.
     @details Returns the internal variable _SetUnixTime.  This is the time the clock was last
@@ -609,7 +608,7 @@ uint32_t MCP7940_Class::getSetUnixTime() const {
   */
   return _SetUnixTime;
 }
-int8_t MCP7940_Class::getCalibrationTrim() const {
+int8_t MCP7940::getCalibrationTrim() const {
   /*!
       @brief   Return the TRIMVAL trim value
       @details Since the number in the register can be negative but is not in excess-128 format any
@@ -622,7 +621,7 @@ int8_t MCP7940_Class::getCalibrationTrim() const {
   }                                          // of if-then less than zero trim
   return ((int8_t)trim);
 }  // of method getCalibrationTrim()
-bool MCP7940_Class::setMFP(const bool value) const {
+bool MCP7940::setMFP(const bool value) const {
   /*!
       @brief   Sets the MFP (Multifunction Pin) to the requested state
       @return  Returns true on success otherwise false
@@ -635,7 +634,7 @@ bool MCP7940_Class::setMFP(const bool value) const {
   writeRegisterBit(MCP7940_CONTROL, MCP7940_OUT, value);
   return true;
 }  // of method setMFP()
-uint8_t MCP7940_Class::getMFP() const {
+uint8_t MCP7940::getMFP() const {
   /*!
       @brief   Gets the MFP (Multifunction Pin) value
       @details On is true and Off is false. This is read from the control register if no alarms are
@@ -657,7 +656,7 @@ uint8_t MCP7940_Class::getMFP() const {
   }                                      // of if-then-else square wave enabled
   return bitRead(controlRegister, MCP7940_OUT);  // MFP in manual mode, return value
 }  // of method getMFP()
-bool MCP7940_Class::setAlarm(const uint8_t alarmNumber, const uint8_t alarmType, const DateTime& dt,
+bool MCP7940::setAlarm(const uint8_t alarmNumber, const uint8_t alarmType, const DateTime& dt,
                              const bool state) const {
   /*!
       @brief   Sets one of the 2 alarms
@@ -699,7 +698,7 @@ bool MCP7940_Class::setAlarm(const uint8_t alarmNumber, const uint8_t alarmType,
   }              // of if-then alarmNumber and alarmType are valid and device running
   return false;  // error if we get here
 }  // of method setAlarm()
-void MCP7940_Class::setAlarmPolarity(const bool polarity) const {
+void MCP7940::setAlarmPolarity(const bool polarity) const {
   /*!
       @brief   Sets the alarm polarity
       @details Alarm polarity (see also TABLE 5-10 on p.27 of the datasheet). Note: the MFP pin is
@@ -715,7 +714,7 @@ void MCP7940_Class::setAlarmPolarity(const bool polarity) const {
                    polarity);  // Write polarity to the ALMPOL bit
   return;
 }  // of method setAlarmPolarity()
-DateTime MCP7940_Class::getAlarm(const uint8_t alarmNumber, uint8_t& alarmType) const {
+DateTime MCP7940::getAlarm(const uint8_t alarmNumber, uint8_t& alarmType) const {
   /*!
       @brief   Gets the DateTime for the given alarm
       @details update the alarmType parameter with the alarm type that was set
@@ -738,7 +737,7 @@ DateTime MCP7940_Class::getAlarm(const uint8_t alarmNumber, uint8_t& alarmType) 
   uint16_t y = 0;  // Year is not part of the alarms
   return DateTime(y, m, d, hh, mm, ss);
 }  // of method getAlarm()
-bool MCP7940_Class::clearAlarm(const uint8_t alarmNumber) const {
+bool MCP7940::clearAlarm(const uint8_t alarmNumber) const {
   /*!
       @brief   Clears the given alarm
       @param[in] alarmNumber Alarm number 0 or 1
@@ -749,7 +748,7 @@ bool MCP7940_Class::clearAlarm(const uint8_t alarmNumber) const {
                    MCP7940_ALM0IF);  // reset register bit
   return true;
 }  // of method clearAlarm()
-bool MCP7940_Class::setAlarmState(const uint8_t alarmNumber, const bool state) const {
+bool MCP7940::setAlarmState(const uint8_t alarmNumber, const bool state) const {
   /*!
       @brief   Turns an alarm on or off without changing the alarm condition
       @param[in] alarmNumber Alarm number 0 or 1
@@ -761,7 +760,7 @@ bool MCP7940_Class::setAlarmState(const uint8_t alarmNumber, const bool state) c
                    state);  // Overwrite register bit
   return true;
 }  // of setAlarmState()
-bool MCP7940_Class::getAlarmState(const uint8_t alarmNumber) const {
+bool MCP7940::getAlarmState(const uint8_t alarmNumber) const {
   /*!
       @brief   Return whether a given alarm is on or off
       @param[in] alarmNumber Alarm number 0 or 1
@@ -771,7 +770,7 @@ bool MCP7940_Class::getAlarmState(const uint8_t alarmNumber) const {
   return readRegisterBit(MCP7940_CONTROL,
                          alarmNumber ? MCP7940_ALM1EN : MCP7940_ALM0EN);  // Get state of alarm
 }  // of getAlarmState()
-bool MCP7940_Class::isAlarm(const uint8_t alarmNumber) const {
+bool MCP7940::isAlarm(const uint8_t alarmNumber) const {
   /*!
       @brief   Return whether a given alarm is active or not
       @param[in] alarmNumber Alarm number 0 or 1
@@ -781,7 +780,7 @@ bool MCP7940_Class::isAlarm(const uint8_t alarmNumber) const {
   return readRegisterBit(alarmNumber ? MCP7940_ALM1WKDAY : MCP7940_ALM0WKDAY,
                          MCP7940_ALM0IF);  // Get alarm state
 }  // of method isAlarm()
-uint8_t MCP7940_Class::getSQWSpeed() const {
+uint8_t MCP7940::getSQWSpeed() const {
   /*!
       @brief  returns the list value for the frequency of the square wave
       @return Integer value index for the square wave frequency:\n
@@ -798,7 +797,7 @@ uint8_t MCP7940_Class::getSQWSpeed() const {
   else
     return 0;
 }  // of method getSQWSpeed()
-bool MCP7940_Class::setSQWSpeed(uint8_t frequency, bool state) const {
+bool MCP7940::setSQWSpeed(uint8_t frequency, bool state) const {
   /*!
       @brief  set the square wave speed to a value
       @param[in] frequency Integer value index for the square wave frequency:\n
@@ -825,7 +824,7 @@ bool MCP7940_Class::setSQWSpeed(uint8_t frequency, bool state) const {
   }  // of if-then-else less then 64Hz or equal
   return state;
 }  // of method setSQWState()
-bool MCP7940_Class::setSQWState(const bool state) const {
+bool MCP7940::setSQWState(const bool state) const {
   /*!
       @brief  set the square wave generator on or off
       @param[in] state Boolean value set to false if square wave is to be turned off, otherwise true
@@ -834,14 +833,14 @@ bool MCP7940_Class::setSQWState(const bool state) const {
   writeRegisterBit(MCP7940_CONTROL, MCP7940_SQWEN, state);  // set the one bit to state
   return state;
 }  // of method setSQWState
-bool MCP7940_Class::getSQWState() const {
+bool MCP7940::getSQWState() const {
   /*!
       @brief  Get the square wave generator state
       @return boolean state of the square wave, "true" for on and "false" for off
   */
   return readRegisterBit(MCP7940_CONTROL, MCP7940_SQWEN);
 }  // of method getSQWState()
-bool MCP7940_Class::setBattery(const bool state) const {
+bool MCP7940::setBattery(const bool state) const {
   /*!
       @brief     Enable or disable the battery backup
       @details   Has no effect on the MCP7940M, only on the MCP7940N
@@ -851,7 +850,7 @@ bool MCP7940_Class::setBattery(const bool state) const {
   writeRegisterBit(MCP7940_RTCWKDAY, MCP7940_VBATEN, state);
   return (state);
 }  // of method setBattery()
-bool MCP7940_Class::getBattery() const {
+bool MCP7940::getBattery() const {
   /*!
       @brief     Return the battery backup state
       @details   Has no effect on the MCP7940M, only on the MCP7940N
@@ -859,7 +858,7 @@ bool MCP7940_Class::getBattery() const {
   */
   return readRegisterBit(MCP7940_RTCWKDAY, MCP7940_VBATEN);
 }  // of method setBattery()
-bool MCP7940_Class::getPowerFail() const {
+bool MCP7940::getPowerFail() const {
   /*!
       @brief     Return the power failure status
       @return    boolean state of the power failure status. "true" if a power failure has occured,
@@ -868,7 +867,7 @@ bool MCP7940_Class::getPowerFail() const {
   bool status = readRegisterBit(MCP7940_RTCWKDAY, MCP7940_PWRFAIL);
   return status;
 }  // of method getPowerFail()
-bool MCP7940_Class::clearPowerFail() const {
+bool MCP7940::clearPowerFail() const {
   /*!
       @brief     Clears the power failure status flag
       @return    Always returns true
@@ -876,3 +875,7 @@ bool MCP7940_Class::clearPowerFail() const {
   I2C_write(MCP7940_RTCWKDAY, readByte(MCP7940_RTCWKDAY));
   return true;
 }  // of method clearPowerFail()
+
+}
+
+// EOF

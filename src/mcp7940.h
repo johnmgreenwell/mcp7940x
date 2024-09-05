@@ -42,14 +42,19 @@ FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details. 
 received a copy of the GNU General Public License along with this program.  If not, see
 <http://www.gnu.org/licenses/>.
 
+
+
  @section author Author
 
 Written by Arnd <Arnd@Zanduino.Com> at https://www.github.com/SV-Zanshin
+
+Modified by John Greenwell to add support for a custom HAL.
 
  @section versions Changelog
 
 Version| Date       | Developer           | Comments
 ------ | ---------- | ------------------- | --------
+1.3.0  | 2024-08-31 | johnmgreenwell      | Modify driver to support custom HAL.
 1.2.2  | 2023-06-12 | Mark-Wills          | Issue #65 - Corrected return value
 1.2.2  | 2021-12-16 | BrotherV            | Issue #63 - Add ESP8266 support for defining SDA and SCL pins.
 1.2.1  | 2021-05-23 | SV-Zanshin          | Issue #60 - Correct handling of dates < 2000-01-01
@@ -99,8 +104,11 @@ Version| Date       | Developer           | Comments
 
 // clang-format on
 
-#include "Arduino.h"  // Arduino data type definitions
-#include "Wire.h"     // Standard I2C "Wire" library
+#include "hal.h"
+
+namespace PeripheralIO
+{
+
 #ifndef MCP7940_h
   /** @brief  Guard code definition */
   #define MCP7940_h  // Define the name inside guard code
@@ -247,14 +255,14 @@ class TimeSpan {
   int32_t _seconds;  ///< Internal value for total seconds
 };                   // of class TimeSpan definition
 
-class MCP7940_Class {
+class MCP7940 {
   /*!
-   @class MCP7940_Class
+   @class MCP7940
    @brief Main class definition with forward declarations
   */
  public:
-  MCP7940_Class(){};   ///< Unused Class constructor
-  ~MCP7940_Class(){};  ///< Unused Class destructor
+  MCP7940(HAL::I2C& i2c) : _i2c(i2c) {};
+  ~MCP7940(){};  ///< Unused Class destructor
   bool     begin(const uint32_t i2cSpeed) const;
   bool     begin(const uint8_t sda = SDA, const uint8_t scl = SCL,
                  const uint32_t i2cSpeed = I2C_STANDARD_MODE) const;
@@ -336,17 +344,11 @@ class MCP7940_Class {
      @param[in] value    Data Type "T" to read
      @return             Pointer to return data structure
     */
-    uint8_t i{0};                                        // return number of bytes read
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);         // Address the special I2C address
-    Wire.write((addr % 8) + MCP7940_EUI_RAM_ADDRESS);    // Send register address to read from
-    if (Wire.endTransmission() == 0) {                   // Close transmission and check error code
-      Wire.requestFrom(MCP7940_EUI_ADDRESS, sizeof(T));  // Request a block of data, max 61 bits
-      uint8_t* bytePtr = (uint8_t*)&value;               // Declare pointer to start of structure
-      for (i = 0; i < sizeof(T); i++) {                  // Loop for each byte to be read
-        *bytePtr++ = Wire.read();                        // Read a byte
-      }                                                  // of for-next each byte
-    }                                                    // if-then success
-    return i;                                            // return number of bytes read
+    // uint8_t i{0};                                        // return number of bytes read
+    uint8_t  data_out = (addr % 8) + MCP7940_EUI_RAM_ADDRESS;
+    uint8_t* data_in  = (uint8_t*)&value;
+    _i2c.writeRead(MCP7940_EUI_ADDRESS, data_out, data_in, sizeof(T));
+    return sizeof(T);
   }                                                      // of method readEUI()
   template <typename T>
   uint8_t writeEUI(const uint8_t& addr, T& value) const {
@@ -359,21 +361,14 @@ class MCP7940_Class {
      @param[in] value    Data Type "T" to read
      @return             Pointer to  data structure to write
     */
-    uint8_t i{0};                                      // return number of bytes read
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
-    Wire.write(MCP7940_EEUNLOCK);                      // Send special register address to write to
-    Wire.write(0x55);                                  // Special write value to start unlock
-    i = Wire.endTransmission();                        // close transmission of first byte
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
-    Wire.write(MCP7940_EEUNLOCK);                      // Send special register address to write to
-    Wire.write(0x55);                                  // Special write value to complete unlock
-    i = Wire.endTransmission();                        // close transmission of second byte
-    Wire.beginTransmission(MCP7940_EUI_ADDRESS);       // Address the special I2C address
-    Wire.write((addr % 8) + MCP7940_EUI_RAM_ADDRESS);  // Send register address to read from
-    Wire.write((uint8_t*)&value, sizeof(T));           // write the data
-    i = Wire.endTransmission();                        // close transmission of actual write
-    if (i == 0) i = sizeof(T);                         // return number of bytes on success
-    return i;                                          // return number of bytes read
+    // uint8_t i{0};                                      // return number of bytes read
+    uint8_t unlock_data[2] = {MCP7940_EEUNLOCK, 0x55};
+    uint8_t address = (addr % 8) + MCP7940_EUI_RAM_ADDRESS;
+    uint8_t *data_out = (uint8_t*)&value;
+    _i2c.write(MCP7940_EUI_ADDRESS, unlock_data, 2);
+    _i2c.write(MCP7940_EUI_ADDRESS, unlock_data, 2);
+    _i2c.write(MCP7940_EUI_ADDRESS, address, data_out, sizeof(T));
+    return sizeof(T);
   }                                                    // of method writeEUI()
 
  private:
@@ -397,18 +392,11 @@ class MCP7940_Class {
     @param[in] value   Data Type "T" to read
     @return    number of bytes read
    */
-    uint8_t i{0};                                    // return number of bytes read
-    Wire.beginTransmission(MCP7940_ADDRESS);         // Address the I2C device
-    Wire.write(address);                             // Send register address to read from
-    if (Wire.endTransmission() == 0) {               // Close transmission and check error code
-      Wire.requestFrom(MCP7940_ADDRESS, sizeof(T));  // Request a block of data
-      uint8_t* bytePtr = (uint8_t*)&value;           // Declare pointer to start of structure
-      for (i = 0; i < sizeof(T); i++) {              // Loop for each byte to be read
-        *bytePtr++ = Wire.read();                    // Read a byte
-      }                                              // of for-next each byte
-    }                                                // if-then success
-    return i;                                        // return number of bytes read
+    uint8_t *data_in = (uint8_t*)&value;
+    _i2c.writeRead(MCP7940_ADDRESS, address, data_in, sizeof(T));
+    return sizeof(T);
   }                                                  // end of template method "I2C_read"
+  
   template <typename T>
   uint8_t I2C_write(const uint8_t address, const T& value) const {
     /*!
@@ -420,12 +408,8 @@ class MCP7940_Class {
       @param[in] value   Data Type "T" to write
       @return    number of bytes written
      */
-    Wire.beginTransmission(MCP7940_ADDRESS);   // Address the I2C device
-    Wire.write(address);                       // Send register address to read from
-    Wire.write((uint8_t*)&value, sizeof(T));   // write the data
-    uint8_t i = Wire.endTransmission();        // close transmission and save status
-    if (i == 0) i = sizeof(T);                 // return number of bytes on success
-    return i;                                  // return the number of bytes written
+    _i2c.write(MCP7940_ADDRESS, address, (uint8_t *)&value, sizeof(T));
+    return sizeof(T);
   }                                            // end of template method "I2C_write()"
   uint8_t readByte(const uint8_t addr) const;  // Read 1 byte from address on I2C
   uint8_t bcd2int(const uint8_t bcd) const;    // convert BCD digits to integer
@@ -435,5 +419,13 @@ class MCP7940_Class {
   void    writeRegisterBit(const uint8_t reg, const uint8_t b,
                            bool bitvalue) const;                      // Clear a bit, values 0-7
   uint8_t readRegisterBit(const uint8_t reg, const uint8_t b) const;  // Read  a bit, values 0-7
+
+  HAL::I2C& _i2c; 
+
 };                                                                    // of MCP7940 class definition
+
+}
+
 #endif
+
+// EOF
