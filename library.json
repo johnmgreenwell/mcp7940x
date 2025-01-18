@@ -7,7 +7,7 @@
         "type": "git",
         "url": "https://github.com/johnmgreenwell/mcp7940x"
     },
-    "license": "MIT",
+    "license": "GPL-3.0",
     "frameworks": "*",
     "platforms": "*",
     "build": {
